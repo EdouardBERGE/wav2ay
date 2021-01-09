@@ -23,12 +23,25 @@ arising from,  out of  or in connection  with  the software  or  the  use  or  o
 Software. »
 -----------------------------------------------------------------------------------------------------
 ***/
+#ifdef _WIN32
+#define OS_WIN 1
+#endif
+
+#ifdef _WIN64
+#define OS_WIN 1
+#endif
+
+#ifdef OS_WIN
+#define _USE_MATH_DEFINES
+#endif
 
 #include<stdlib.h>
 #include<string.h>
 #include<stdio.h>
 #include<errno.h>
 #include<math.h>
+
+#define MAXCHANNEL 3
 
 /*************************************************************************
   CSV Export Func
@@ -73,17 +86,20 @@ void push_wav(char *outputfilename, short int *data, int n) {
 	unsigned char chunksize[4];
 	char RIFF[5];
 	FILE *f;
+#ifdef OS_WIN
+	int sr;
+#endif
 
 	datasize=n*2;
 
-	strncpy(wav_header.ChunkID,"RIFF",4);
+	memcpy(wav_header.ChunkID,"RIFF",4);
 	riffsize=datasize+16+8+datasize+8;
 	wav_header.ChunkSize[0]=riffsize&0xFF;
 	wav_header.ChunkSize[1]=(riffsize>>8)&0xFF;
 	wav_header.ChunkSize[2]=(riffsize>>16)&0xFF;
 	wav_header.ChunkSize[3]=(riffsize>>24)&0xFF;
-	strncpy(wav_header.Format,"WAVE",4);
-	strncpy(wav_header.SubChunk1ID,"fmt ",4);
+	memcpy(wav_header.Format,"WAVE",4);
+	memcpy(wav_header.SubChunk1ID,"fmt ",4);
 	wav_header.SubChunk1Size[0]=16;
 	wav_header.AudioFormat[0]=1; // integer
 	wav_header.NumChannels[0]=1;
@@ -102,6 +118,13 @@ void push_wav(char *outputfilename, short int *data, int n) {
 
 	// dataaaaa output
 	f=fopen(outputfilename,"wb");
+#ifdef OS_WIN
+	sr=_setmode(_fileno(last_id), _O_BINARY );
+	if (sr==-1) {
+		fprintf(stderr,"wavoutput windows binary mode got problem!\n");
+		exit(1);
+	}
+#endif
 	if (!f) {
 		fprintf(stderr,"wavoutput got problem!\n");
 		exit(1);
@@ -149,7 +172,7 @@ double *load_wav(char *filename, int *n, double *acqui) {
                 return NULL;
         }
 
-	data=malloc(filesize);
+	data=(unsigned char *)malloc(filesize);
 	fread(data,1,filesize,f);
 	fclose(f);
 
@@ -219,7 +242,7 @@ double *load_wav(char *filename, int *n, double *acqui) {
 	fprintf(stderr,"nbchannel=%d | bitpersample=%d | Format=%s | frequency=%d\n",nbchannel,bitspersample,wFormat==1?"PCM":"IEEE Float",frequency);
 
 	*acqui=frequency;
-	wav=malloc(nbsample*sizeof(double));
+	wav=(double *)malloc(nbsample*sizeof(double));
 	idx=subchunk-data;
 
        for (i=0;i<nbsample;i++) {
@@ -326,7 +349,7 @@ void passe_bande(double acqui,double basse,double haute,double *datain,double *d
         if (basse>acqui) basse=acqui;
         if (haute>acqui) haute=acqui;
 
-        datatmp=malloc(sizeof(double)*nb);
+        datatmp=(double *)malloc(sizeof(double)*nb);
         if (!datatmp) return;
 
         a=M_PI*basse/acqui;
@@ -385,7 +408,7 @@ double * compute_AY(int ws, int replay, int clean, double cuthigh, double cutlow
 
 	freq=replay*ws; // echantillons/seconde
 
-	minisignal=malloc(ws*sizeof(double));
+	minisignal=(double *)malloc(ws*sizeof(double));
 
 	i=periode;
 
@@ -394,7 +417,7 @@ double * compute_AY(int ws, int replay, int clean, double cuthigh, double cutlow
 
 	// keep shanon compliant
 	if (target*2>freq) {
-		retfour=malloc(ws*sizeof(double));
+		retfour=(double *)malloc(ws*sizeof(double));
 		memset(retfour,0,ws*sizeof(double));
 		free(minisignal);
 		return retfour;
@@ -411,7 +434,7 @@ double * compute_AY(int ws, int replay, int clean, double cuthigh, double cutlow
 			tic+=mtic;
 		}
 	}
-	retfour=malloc(ws*sizeof(double));
+	retfour=(double *)malloc(ws*sizeof(double));
 	calcule_fourier(minisignal,ws,retfour,clean);
 
 	free(minisignal);
@@ -470,10 +493,10 @@ void do_sample(double *data,int n, double pw, double cutlow, double cuthigh, dou
 	int nbpausedma;
 	int channel;
 
-	int AYprevperiod[3];
-	int AYprevvolume[3];
-	int AYperiod[3];
-	int AYvolume[3];
+	int AYprevperiod[MAXCHANNEL];
+	int AYprevvolume[MAXCHANNEL];
+	int AYperiod[MAXCHANNEL];
+	int AYvolume[MAXCHANNEL];
 	int nbchanges;
 
 	if (pw<0.0 || pw>0.75) {
@@ -489,6 +512,7 @@ void do_sample(double *data,int n, double pw, double cutlow, double cuthigh, dou
 		cuthigh=2500.0;
 		cutlow=replay;
 	}
+	if (cutlow<workingfreq/4095.0*1.3) cutlow=workingfreq/4095.0*1.3;
 
 	ws=acqui/replay; // 312 samples pour 15000Hz avec replay a 50Hz
 	if (ws<200) {
@@ -512,14 +536,14 @@ void do_sample(double *data,int n, double pw, double cutlow, double cuthigh, dou
 		n=nbwin*ws;
 	}
 
-	newdata=malloc(sizeof(double)*n);
+	newdata=(double *)malloc(sizeof(double)*n);
 
 	// calculer la valeur du nettoyage a faire sur la transformee pour eviter les basses frequences mal filtrees
 	resolution=acqui/(double)ws;
 	clean=1+floor(replay/resolution+0.5);
 
 	// precalc des fouriers de l'AY sur la fenetre utilisee
-	ay=malloc(4096*sizeof(struct s_ay_period));
+	ay=(struct s_ay_period *)malloc(4096*sizeof(struct s_ay_period));
 	memset(ay,0,4096*sizeof(struct s_ay_period));
 
 	// par defaut il faut filtrer en dessous de la frequence de replay et au dessus de 2500Hz a cause de la precision de restitution
@@ -528,8 +552,8 @@ void do_sample(double *data,int n, double pw, double cutlow, double cuthigh, dou
 	memcpy(data,newdata,n*sizeof(double));
 
 	// init temporal buffer	
-	fourier=malloc(sizeof(double)*ws);
-	oldfourier=malloc(sizeof(double)*ws);
+	fourier=(double *)malloc(sizeof(double)*ws);
+	oldfourier=(double *)malloc(sizeof(double)*ws);
 	calcule_fourier(data,ws,oldfourier,clean);
 
 	fprintf(stderr,"%d windows for a %.1lfs sample\n",nbwin,n/acqui);
@@ -550,7 +574,7 @@ void do_sample(double *data,int n, double pw, double cutlow, double cuthigh, dou
 	}
 
 	if (wavout_filename) {
-		wavout=malloc(nbwin*(sizeof(short int)*workingfreq*2.0/replay+1));
+		wavout=(short int *)malloc(nbwin*(sizeof(short int)*workingfreq*2.0/replay+1));
 		wavout_n=0;
 	}
 
@@ -590,6 +614,8 @@ void do_sample(double *data,int n, double pw, double cutlow, double cuthigh, dou
 
 				// appliquer la soustraction AY sur la transformee de Fourier pour la suite
 				imax=workingfreq/picfreq; // periode AY
+				if (imax>4095) imax=4095;
+
 				if (!ay[imax].fourier) ay[imax].fourier=compute_AY(ws,replay,clean,cuthigh,cutlow,imax,workingfreq);
 
 				subcoef=fourier[k]/ay[imax].fourier[k];
@@ -643,8 +669,8 @@ void do_sample(double *data,int n, double pw, double cutlow, double cuthigh, dou
 			int ref[16]={0,231,695,1158,2084,2779,4168,6716,8105,13200,18294,24315,32189,40757,52799,65535};
 			int pulse,maxp;
 			int acc;
-			int tic[3]={0};
-			int vchan[3];
+			int tic[MAXCHANNEL]={0};
+			int vchan[MAXCHANNEL];
 
 			maxp=workingfreq*2.0/replay;
 			for (channel=0;channel<nbchannel;channel++) {
@@ -736,6 +762,7 @@ void do_sample(double *data,int n, double pw, double cutlow, double cuthigh, dou
 			wavout[oidx++]=acc;
 		}
 		push_wav(wavout_filename,wavout,oidx);
+		free(wavout);
 	}
 }
 
@@ -751,7 +778,7 @@ void usage() {
 	printf("-tresh  <value>  minimal energy| default 0.25 is minimum (max usable approx 15)\n");
 	printf("-replay <value>  frequency play| default 10\n");
 	printf("-high   <value>  highcut filter| default 4000\n");
-	printf("-low    <value>  lowcut filter | default is replay\n");
+	printf("-low    <value>  lowcut filter | default is replay (min: 20Hz)\n");
 //	printf("-pw     <value>  sound inertia | default 0.0 max 0.75\n");
 	printf("-wfreq  <value>  AY frequency  | default 1000000 (1MHz)\n");
 	printf("-nbchan <value>  nb channel    | default 3\n");
@@ -797,7 +824,7 @@ void main(int argc, char **argv) {
 			preamp=atof(argv[++i]);
 		} else if (strcmp(argv[i],"-nbchan")==0 && i+1<argc) {
 			nbchannel=atoi(argv[++i]);
-			if (nbchannel<1 || nbchannel>3) usage();
+			if (nbchannel<1 || nbchannel>MAXCHANNEL) usage();
 		} else if (strcmp(argv[i],"-replay")==0 && i+1<argc) {
 			replay=atof(argv[++i]);
 		} else if (strcmp(argv[i],"-high")==0 && i+1<argc) {
