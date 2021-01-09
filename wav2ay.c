@@ -33,6 +33,8 @@ Software. »
 
 #ifdef OS_WIN
 #define _USE_MATH_DEFINES
+#include<io.h>
+#include<fcntl.h>
 #endif
 
 #include<stdlib.h>
@@ -110,7 +112,7 @@ void push_wav(char *outputfilename, short int *data, int n) {
 	wav_header.ByteRate[2]=0x01; // 88.2Kbio
 	wav_header.BlockAlign[0]=2;
 	wav_header.BitsPerSample[0]=16;
-	strncpy(wav_header.SubChunk2ID,"data",4);
+	memcpy(wav_header.SubChunk2ID,"data",4);
 	wav_header.SubChunk2Size[0]=datasize&0xFF;
 	wav_header.SubChunk2Size[1]=(datasize>>8)&0xFF;
 	wav_header.SubChunk2Size[2]=(datasize>>16)&0xFF;
@@ -484,7 +486,7 @@ void do_sample(double *data,int n, double pw, double cutlow, double cuthigh, dou
 	double *newdata,subcoef;
 	double vmax,resolution,picfreq;
 	int nbwin,i,j,k,imax,ws,clean;
-	struct s_ay_period *ay;
+	struct s_ay_period *ay=NULL;
 	short int *wavout;
 	int wavout_n=0;
 
@@ -529,7 +531,7 @@ void do_sample(double *data,int n, double pw, double cutlow, double cuthigh, dou
 		nbwin++;
 	}
 	if (nbwin*ws!=n) {
-		data=realloc(data,sizeof(double)*nbwin*ws);
+		data=(double *)realloc(data,sizeof(double)*nbwin*ws);
 		for (i=n;i<nbwin*ws;i++) {
 			data[i]=data[i-1]*0.95; // histoire de terminer salement mais en evitant le poc => normalement le sample est ok de base!
 		}
