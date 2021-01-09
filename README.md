@@ -2,8 +2,11 @@
 tool using Fourier transform, doing sample conversion to simple frequencies
 
 =========== conversion from WAV to AY registers ===========
+
 usage: wav2ay.exe <wavfile> <options>
+  
 options:
+
 -preamp <value>  amplification | default 1.0
 -tresh  <value>  minimal energy| default 0.25 is minimum (max usable approx 15)
 -replay <value>  frequency play| default 10
