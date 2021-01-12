@@ -27,3 +27,4 @@ options:
   
 -verbose
 
+![Street Fighter 2 Adoken conversion](https://github.com/EdouardBERGE/wav2ay/blob/main/mimic.png)
