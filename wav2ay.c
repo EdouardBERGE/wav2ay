@@ -121,7 +121,7 @@ void push_wav(char *outputfilename, short int *data, int n) {
 	// dataaaaa output
 	f=fopen(outputfilename,"wb");
 #ifdef OS_WIN
-	sr=_setmode(_fileno(last_id), _O_BINARY );
+	sr=_setmode(_fileno(f), _O_BINARY );
 	if (sr==-1) {
 		fprintf(stderr,"wavoutput windows binary mode got problem!\n");
 		exit(1);
