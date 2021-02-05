@@ -82,6 +82,16 @@ unsigned char SubChunk2ID[4];
 unsigned char SubChunk2Size[4];
 };
 
+/*
+ * strange WAV header
+ *
+00000000  52 49 46 46 b2 83 c8 00  57 41 56 45 66 6d 74 20  |RIFF....WAVEfmt |
+00000010  12 00 00 00 01 00 01 00  22 56 00 00 44 ac 00 00  |........"V..D...|
+00000020  02 00 10 00 00 00 66 61  63 74 04 00 00 00 c0 41  |......fact.....A|
+00000030  64 00 64 61 74 61 80 83  c8 00 00 00 00 00 00 00  |d.data..........|
+00000040  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+*/
+
 void push_wav(char *outputfilename, short int *data, int n) {
 	struct s_wav_header wav_header={0};
 	unsigned int datasize,riffsize;
@@ -186,9 +196,7 @@ double *load_wav(char *filename, int *n, double *acqui) {
         }
         controlsize=wav_header->SubChunk1Size[0]+wav_header->SubChunk1Size[1]*256+wav_header->SubChunk1Size[2]*65536+wav_header->SubChunk1Size[3]*256*65536;
         if (controlsize!=16) {
-                fprintf(stderr,"WAV import - invalid wav chunk size (subchunk1 control)\n");
-		free(data);
-                return NULL;
+                fprintf(stderr,"WAV import - invalid wav chunk size (subchunk1 control) => %d!=16\n",controlsize);
         }
         if (strncmp(wav_header->SubChunk1ID,"fmt",3)) {
                 fprintf(stderr,"WAV import - unsupported audio sample type (subchunk1id must be 'fmt')\n");
@@ -196,18 +204,22 @@ double *load_wav(char *filename, int *n, double *acqui) {
                 return NULL;
         }
 
-        subchunk=(unsigned char *)&wav_header->SubChunk2ID;
-        while (strncmp((char *)subchunk,"data",4)) {
-                subchunksize=8+subchunk[4]+subchunk[5]*256+subchunk[6]*65536+subchunk[7]*256*65536;
-                if (subchunksize>=filesize) {
-                        fprintf(stderr,"WAV import - data subchunk not found\n");
+	if (controlsize==16) {
+		subchunk=(unsigned char *)&wav_header->SubChunk2ID;
+	} else {
+		subchunk=(unsigned char *)&wav_header->SubChunk2ID-16+controlsize;
+	}
+	while (strncmp((char *)subchunk,"data",4)) {
+		subchunksize=8+subchunk[4]+subchunk[5]*256+subchunk[6]*65536+subchunk[7]*256*65536;
+		if (subchunksize>=filesize) {
+			fprintf(stderr,"WAV import - data subchunk not found\n");
 			free(data);
-                        return NULL;
-                }
-                subchunk+=subchunksize;
-        }
-        subchunksize=subchunk[4]+subchunk[5]*256+subchunk[6]*65536+subchunk[7]*256*65536;
-        controlsize=subchunksize;
+			return NULL;
+		}
+		subchunk+=subchunksize;
+	}
+	subchunksize=subchunk[4]+subchunk[5]*256+subchunk[6]*65536+subchunk[7]*256*65536;
+	controlsize=subchunksize;
 
         nbchannel=wav_header->NumChannels[0]+wav_header->NumChannels[1]*256;
         if (nbchannel<1) {
