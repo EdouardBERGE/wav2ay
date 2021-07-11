@@ -767,7 +767,7 @@ void do_sample(double *data,int n, double pw, double cutlow, double cuthigh, dou
 			iidx=integer_part;
 			acc=(1.0-frac)*wavout[iidx];
 			while (integer_part+1.0<pos+step) {
-				acc+=wavout[+iidx];
+				acc+=wavout[++iidx];
 				integer_part+=1.0;
 			}
 			frac=modf(pos,&integer_part);
