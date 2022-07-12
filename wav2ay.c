@@ -493,7 +493,7 @@ int getvolume(double level) {
 	return volume;
 }
 
-void do_sample(double *data,int n, double pw, double cutlow, double cuthigh, double acqui, double replay, double preamp, int info, double workingfreq, int nbchannel, double treshold, int dmalist, char *wavout_filename) {
+void do_sample(double *data,int n, double pw, double cutlow, double cuthigh, double acqui, double replay, double preamp, int info, double workingfreq, int nbchannel, double treshold, int dmalist, char *wavout_filename, int *channel_list) {
 	double *fourier,*oldfourier;
 	double *newdata,subcoef;
 	double vmax,resolution,picfreq;
@@ -749,7 +749,7 @@ void do_sample(double *data,int n, double pw, double cutlow, double cuthigh, dou
 		*********************************/
 			printf("%d",i);
 			for (channel=0;channel<nbchannel;channel++) {
-				printf(";%d;%d",8+channel  ,AYvolume[channel]);
+				printf(";%d;%d",channel_list[channel]  ,AYvolume[channel]);
 				printf(";%d;%d",0+channel*2,AYperiod[channel]&0xFF);
 				printf(";%d;%d",1+channel*2,AYperiod[channel]>>8);
 			}
@@ -796,6 +796,7 @@ void usage() {
 //	printf("-pw     <value>  sound inertia | default 0.0 max 0.75\n");
 	printf("-wfreq  <value>  AY frequency  | default 1000000 (1MHz)\n");
 	printf("-nbchan <value>  nb channel    | default 3\n");
+	printf("-chans  <value>  channel used  | default 'ABC'\n");
 	printf("-dmalist         output optimised DMA list\n");
 	printf("-wavout <file>   output WAV preview\n");
 	printf("-verbose\n");
@@ -804,11 +805,12 @@ void usage() {
 }
 
 void main(int argc, char **argv) {
-	int info,n,i,ifilename=-1;
+	int info,n,i,ifilename=-1,idx;
 	double *data;
 	// conversion param
 	double preamp,replay,acqui,cuthigh,cutlow,pw,workingfreq,treshold;
 	int nbchannel,dmalist;
+	int channel_list[3],ichan=0;
 	char *wavoutfilename=NULL;
 
 	dmalist=0;
@@ -821,6 +823,11 @@ void main(int argc, char **argv) {
 	workingfreq=62500.0;
 	nbchannel=3;
 	treshold=0.5;
+
+	// default channels
+	channel_list[0]=8;
+	channel_list[1]=9;
+	channel_list[2]=10;
 
 	for (i=1;i<argc;i++) {
 		if (strcmp(argv[i],"-dmalist")==0) {
@@ -836,6 +843,19 @@ void main(int argc, char **argv) {
 			workingfreq=atof(argv[++i])/16.0;
 		} else if (strcmp(argv[i],"-preamp")==0 && i+1<argc) {
 			preamp=atof(argv[++i]);
+		} else if (strcmp(argv[i],"-chans")==0 && i+1<argc) {
+			for (idx=0;argv[i+1][idx];idx++) {
+				switch (argv[i+1][idx]) {
+					case 'a':case 'A':case '0':channel_list[ichan++]=8;break;
+					case 'b':case 'B':case '1':channel_list[ichan++]=9;break;
+					case 'c':case 'C':case '2':channel_list[ichan++]=10;break;
+					default:
+					   fprintf(stderr,"Error defining channels, must be like -chans ABC or -chans 012 or -chans b\n");
+					   exit(0);
+				}
+				if (ichan==3) break; // skip
+			}
+			i++;
 		} else if (strcmp(argv[i],"-nbchan")==0 && i+1<argc) {
 			nbchannel=atoi(argv[++i]);
 			if (nbchannel<1 || nbchannel>MAXCHANNEL) usage();
@@ -855,7 +875,7 @@ void main(int argc, char **argv) {
 	if (ifilename==-1) usage();
 
 	if ((data=load_wav(argv[ifilename],&n,&acqui))!=NULL) {
-		do_sample(data,n,pw,cutlow,cuthigh,acqui,replay,preamp,info,workingfreq,nbchannel,treshold,dmalist,wavoutfilename);
+		do_sample(data,n,pw,cutlow,cuthigh,acqui,replay,preamp,info,workingfreq,nbchannel,treshold,dmalist,wavoutfilename,channel_list);
 	}
 }
 
