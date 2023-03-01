@@ -209,6 +209,7 @@ double *load_wav(char *filename, int *n, double *acqui) {
 	} else {
 		subchunk=(unsigned char *)&wav_header->SubChunk2ID-16+controlsize;
 	}
+	// tant qu on n est pas sur le chunk data, on avance dans le "TIFF"
 	while (strncmp((char *)subchunk,"data",4)) {
 		subchunksize=8+subchunk[4]+subchunk[5]*256+subchunk[6]*65536+subchunk[7]*256*65536;
 		if (subchunksize>=filesize) {
@@ -219,7 +220,7 @@ double *load_wav(char *filename, int *n, double *acqui) {
 		subchunk+=subchunksize;
 	}
 	subchunksize=subchunk[4]+subchunk[5]*256+subchunk[6]*65536+subchunk[7]*256*65536;
-	controlsize=subchunksize;
+	controlsize=subchunksize; // taille des samples
 
         nbchannel=wav_header->NumChannels[0]+wav_header->NumChannels[1]*256;
         if (nbchannel<1) {
@@ -229,7 +230,7 @@ double *load_wav(char *filename, int *n, double *acqui) {
         }
 
         wFormat=wav_header->AudioFormat[0]+wav_header->AudioFormat[1]*256;
-        if (wFormat!=1) { // && wFormat!=3) {
+        if (wFormat!=1) {
                 fprintf(stderr,"WAV import - invalid or unsupported wFormatTag (%04X)\n",wFormat);
 		free(data);
                 return NULL;
@@ -257,7 +258,7 @@ double *load_wav(char *filename, int *n, double *acqui) {
 
 	*acqui=frequency;
 	wav=(double *)malloc(nbsample*sizeof(double));
-	idx=subchunk-data;
+	idx=subchunk+8-data;
 
        for (i=0;i<nbsample;i++) {
 		/* downmixing */
@@ -592,8 +593,9 @@ void do_sample(double *data,int n, double pw, double cutlow, double cuthigh, dou
 		wavout_n=0;
 	}
 
+	if (preamp!=1.0) for (j=0;j<n;j++) data[j]*=preamp;
+
 	for (i=0;i<nbwin;i++) {
-		if (preamp!=1.0) for (j=0;j<ws;j++) data[ws*i+j]*=preamp;
 
 		// calcul de fourier sur le segment
 		calcule_fourier(&data[ws*i],ws,fourier,clean);
