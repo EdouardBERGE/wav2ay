@@ -494,7 +494,7 @@ int getvolume(double level) {
 	return volume;
 }
 
-void do_sample(double *data,int n, double pw, double cutlow, double cuthigh, double acqui, double replay, double preamp, int info, double workingfreq, int nbchannel, double treshold, int dmalist, char *wavout_filename, int *channel_list) {
+void do_sample(double *data,int n, double pw, double cutlow, double cuthigh, double acqui, double replay, double preamp, int info, double workingfreq, int nbchannel, double treshold, int dmalist, char *wavout_filename, int *channel_list, int cpclist) {
 	double *fourier,*oldfourier;
 	double *newdata,subcoef;
 	double vmax,resolution,picfreq;
@@ -513,6 +513,8 @@ void do_sample(double *data,int n, double pw, double cutlow, double cuthigh, dou
 	int AYperiod[MAXCHANNEL];
 	int AYvolume[MAXCHANNEL];
 	int nbchanges;
+	int makenoise=0;
+	int hadnoise=0;
 
 	if (pw<0.0 || pw>0.75) {
 		fprintf(stderr,"previous weight not in [0.0:0.75] interval. Default value is 0.25\n");
@@ -574,11 +576,11 @@ void do_sample(double *data,int n, double pw, double cutlow, double cuthigh, dou
 	fprintf(stderr,"%d windows for a %.1lfs sample\n",nbwin,n/acqui);
 
 	for (channel=0;channel<nbchannel;channel++) {
-		AYprevperiod[channel]=0;
+		AYprevperiod[channel]=0xFFFF;
 		AYprevvolume[channel]=0;
 	}
 
-	if (!dmalist) {
+	if (!dmalist && !cpclist) {
 		printf("idx");
 		for (channel=0;channel<nbchannel;channel++) {
 			printf(";reg;value");
@@ -628,6 +630,8 @@ void do_sample(double *data,int n, double pw, double cutlow, double cuthigh, dou
 				picfreq=calcule_fourier_precision(&data[ws*i],ws,imax,cutlow,imax*resolution)*resolution;
 				if (info) fprintf(stderr," => recherche de precision donne %.1lfHz\n",picfreq);
 
+				if (picfreq>2500) makenoise++;
+
 				// appliquer la soustraction AY sur la transformee de Fourier pour la suite
 				imax=workingfreq/picfreq; // periode AY
 				if (imax>4095) imax=4095;
@@ -652,7 +656,37 @@ void do_sample(double *data,int n, double pw, double cutlow, double cuthigh, dou
 		/*********************************
 		       Channel optimisation   
 		*********************************/
-		/* switch channel if period is the same */
+
+		// d'abord un tri pour conserver une harmonie éventuelle sur le volume!
+		if (nbchannel>1) {
+			if (AYperiod[0]<AYperiod[1]) {
+				imax=AYperiod[1];
+				AYperiod[1]=AYperiod[0];
+				AYperiod[0]=imax;
+				imax=AYvolume[1];
+				AYvolume[1]=AYvolume[0];
+				AYvolume[0]=imax;
+			}
+			if (nbchannel>2) {
+				if (AYperiod[0]<AYperiod[2]) {
+					imax=AYperiod[2];
+					AYperiod[2]=AYperiod[0];
+					AYperiod[0]=imax;
+					imax=AYvolume[2];
+					AYvolume[2]=AYvolume[0];
+					AYvolume[0]=imax;
+				}
+				if (AYperiod[1]<AYperiod[2]) {
+					imax=AYperiod[2];
+					AYperiod[2]=AYperiod[1];
+					AYperiod[1]=imax;
+					imax=AYvolume[2];
+					AYvolume[2]=AYvolume[1];
+					AYvolume[1]=imax;
+				}
+			}
+		}
+		/* switch channel if period are exactly the same */
 		if (nbchannel>1) {
 			if (AYperiod[0]==AYprevperiod[1]) {
 				imax=AYperiod[1];
@@ -709,6 +743,53 @@ void do_sample(double *data,int n, double pw, double cutlow, double cuthigh, dou
 		}
 
 		/*********************************
+		      Amstrad CPC list output
+		*********************************/
+		if (cpclist) {
+			int packed_exec=0;
+			int minilist[10];
+			int ilist=0;
+			int zebit=128;
+
+			if (!i) {
+				printf("defb %d ; nombre d'iterations\n",nbwin);
+			}
+
+			for (channel=0;channel<3;channel++) {
+				if (AYvolume[channel]!=AYprevvolume[channel]) {
+					packed_exec|=zebit;
+					minilist[ilist++]=AYvolume[channel];
+				}
+				zebit>>=1;
+				if ((AYperiod[channel]>>8)!=(AYprevperiod[channel]>>8)) {
+					packed_exec|=zebit;
+					minilist[ilist++]=AYperiod[channel]>>8;
+				}
+				zebit>>=1;
+				minilist[ilist++]=AYperiod[channel]&0xFF; // au minimum on enverra la frequence "basse"
+			}
+
+			if (hadnoise && !makenoise) {
+				packed_exec|=2;
+				minilist[ilist++]=56;
+			}
+			if (!hadnoise && makenoise) {
+				packed_exec|=2;
+				minilist[ilist++]=0; // bruit partout sinon on n'entend rien...
+			}
+			printf("defb #%02X",packed_exec);
+			for (channel=0;channel<ilist;channel++) printf(",#%02X",minilist[channel]);
+			printf(" ; %5d-%02d %5d-%02d %5d-%02d\n",AYperiod[0],AYvolume[0],AYperiod[1],AYvolume[1],AYperiod[2],AYvolume[2]);
+
+			hadnoise=makenoise;
+			makenoise=0;
+
+			for (channel=0;channel<nbchannel;channel++) {
+				AYprevperiod[channel]=AYperiod[channel];
+				AYprevvolume[channel]=AYvolume[channel];
+			}
+		} else
+		/*********************************
 		      Amstrad Plus DMA output
 		*********************************/
 		if (dmalist) {
@@ -749,12 +830,23 @@ void do_sample(double *data,int n, double pw, double cutlow, double cuthigh, dou
 		/*********************************
 		            CSV Export
 		*********************************/
-			printf("%d",i);
+			if (!i) {
+			}
+			printf(";%d",i);
 			for (channel=0;channel<nbchannel;channel++) {
 				printf(";%d;%d",channel_list[channel]  ,AYvolume[channel]);
 				printf(";%d;%d",0+channel*2,AYperiod[channel]&0xFF);
 				printf(";%d;%d",1+channel*2,AYperiod[channel]>>8);
 			}
+			if (hadnoise && !makenoise) {
+				printf(";7;0");
+			}
+			if (!hadnoise && makenoise) {
+				printf(";7;40");
+			}
+			if (makenoise) printf(" // noise");
+			hadnoise=makenoise;
+			makenoise=0;
 			printf("\n");
 		}
 	}
@@ -800,6 +892,7 @@ void usage() {
 	printf("-nbchan <value>  nb channel    | default 3\n");
 	printf("-chans  <value>  channel used  | default 'ABC'\n");
 	printf("-dmalist         output optimised DMA list\n");
+	printf("-cpclist         output optimised list for CPC replay\n");
 	printf("-wavout <file>   output WAV preview\n");
 	printf("-verbose\n");
 	printf("\n");
@@ -811,11 +904,11 @@ void main(int argc, char **argv) {
 	double *data;
 	// conversion param
 	double preamp,replay,acqui,cuthigh,cutlow,pw,workingfreq,treshold;
-	int nbchannel,dmalist;
+	int nbchannel,dmalist,cpclist;
 	int channel_list[3],ichan=0;
 	char *wavoutfilename=NULL;
 
-	dmalist=0;
+	dmalist=cpclist=0;
 	preamp=1.0;
 	replay=10;
 	cuthigh=4000;
@@ -834,6 +927,8 @@ void main(int argc, char **argv) {
 	for (i=1;i<argc;i++) {
 		if (strcmp(argv[i],"-dmalist")==0) {
 			dmalist=1;
+		} else if (strcmp(argv[i],"-cpclist")==0) {
+			cpclist=1;
 		} else if (strcmp(argv[i],"-verbose")==0) {
 			info=1;
 		} else if (strcmp(argv[i],"-tresh")==0 && i+1<argc) {
@@ -877,7 +972,7 @@ void main(int argc, char **argv) {
 	if (ifilename==-1) usage();
 
 	if ((data=load_wav(argv[ifilename],&n,&acqui))!=NULL) {
-		do_sample(data,n,pw,cutlow,cuthigh,acqui,replay,preamp,info,workingfreq,nbchannel,treshold,dmalist,wavoutfilename,channel_list);
+		do_sample(data,n,pw,cutlow,cuthigh,acqui,replay,preamp,info,workingfreq,nbchannel,treshold,dmalist,wavoutfilename,channel_list,cpclist);
 	}
 }
 
