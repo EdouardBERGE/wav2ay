@@ -778,8 +778,12 @@ void do_sample(double *data,int n, double pw, double cutlow, double cuthigh, dou
 				minilist[ilist++]=0; // bruit partout sinon on n'entend rien...
 			}
 			printf("defb #%02X",packed_exec);
-			for (channel=0;channel<ilist;channel++) printf(",#%02X",minilist[channel]);
-			printf(" ; %5d-%02d %5d-%02d %5d-%02d\n",AYperiod[0],AYvolume[0],AYperiod[1],AYvolume[1],AYperiod[2],AYvolume[2]);
+			if (packed_exec) {
+				for (channel=0;channel<ilist;channel++) printf(",#%02X",minilist[channel]);
+				printf(" ; %5d-%02d %5d-%02d %5d-%02d %s\n",AYperiod[0],AYvolume[0],AYperiod[1],AYvolume[1],AYperiod[2],AYvolume[2],packed_exec&2?"noise mod":"");
+			} else {
+				printf("\n");
+			}
 
 			hadnoise=makenoise;
 			makenoise=0;
