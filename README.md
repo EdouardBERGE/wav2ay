@@ -20,10 +20,16 @@ options:
 -wfreq  <value>  AY frequency  | default 1000000 (1MHz)
   
 -nbchan <value>  nb channel    | default 3
+
+-chans  <value>  channel used  | default 'ABC'
   
 -dmalist         output optimised DMA list
 
+-cpclist         output optomised CPC list
+
 -wavout <file>   output WAV preview
+
+-aki    <file>   output AKI instrument file for Arkos Track 2
   
 -verbose
 
