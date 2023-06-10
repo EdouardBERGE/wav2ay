@@ -494,7 +494,7 @@ int getvolume(double level) {
 	return volume;
 }
 
-void do_sample(double *data,int n, double pw, double cutlow, double cuthigh, double acqui, double replay, double preamp, int info, double workingfreq, int nbchannel, double treshold, int dmalist, char *wavout_filename, int *channel_list, int cpclist) {
+void do_sample(double *data,int n, double pw, double cutlow, double cuthigh, double acqui, double replay, double preamp, int info, double workingfreq, int nbchannel, double treshold, int dmalist, char *wavout_filename, int *channel_list, int cpclist, char *akifilename) {
 	double *fourier,*oldfourier;
 	double *newdata,subcoef;
 	double vmax,resolution,picfreq;
@@ -515,6 +515,10 @@ void do_sample(double *data,int n, double pw, double cutlow, double cuthigh, dou
 	int nbchanges;
 	int makenoise=0;
 	int hadnoise=0;
+	FILE *akifile;
+#ifdef OS_WIN
+	int sr;
+#endif
 
 	if (pw<0.0 || pw>0.75) {
 		fprintf(stderr,"previous weight not in [0.0:0.75] interval. Default value is 0.25\n");
@@ -596,6 +600,33 @@ void do_sample(double *data,int n, double pw, double cutlow, double cuthigh, dou
 	}
 
 	if (preamp!=1.0) for (j=0;j<n;j++) data[j]*=preamp;
+
+	if (akifilename) {
+		akifile=fopen(akifilename,"wb");
+		if (!akifile) {
+			fprintf(stderr,"FATAL: cannot open %s for writing\n",akifilename);
+			exit(-66);
+		}
+#ifdef OS_WIN
+		sr=_setmode(_fileno(akifile), _O_BINARY );
+		if (sr==-1) {
+			fprintf(stderr,"aki output binary mode got problem!\n");
+			exit(1);
+		}
+#endif
+		fprintf(akifile,"<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"\
+			"<aks:instrument xmlns:aks=\"http://www.julien-nevo.com/ArkosTrackerInstrument\" "\
+			"xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xsi:schemaLocation=\"http://www.julien-nevo.com/ArkosTrackerInstrument.xsd\">\n"\
+			"  <aks:fmInstrument version=\"1.0\">\n"\
+			"    <aks:number>1</aks:number>\n"\
+			"    <aks:title>%s</aks:title>\n"\
+			"    <aks:speed>%d</aks:speed>\n"\
+			"    <aks:isLooping>false</aks:isLooping>\n"\
+			"    <aks:loopStartIndex>%d</aks:loopStartIndex>\n"\
+			"    <aks:endIndex>%d</aks:endIndex>\n"\
+			"    <aks:isRetrig>false</aks:isRetrig>\n"\
+			"    <aks:colorArgb>4281370811</aks:colorArgb>\n",akifilename,replay==50?0:replay==25?1:2,nbwin-1,nbwin-1);
+	}
 
 	for (i=0;i<nbwin;i++) {
 
@@ -853,6 +884,28 @@ void do_sample(double *data,int n, double pw, double cutlow, double cuthigh, dou
 			makenoise=0;
 			printf("\n");
 		}
+
+		if (akifilename) {
+			fprintf(akifile,"    <aks:fmInstrumentCell>\n"\
+				"      <aks:link>softOnly</aks:link>\n"\
+				"      <aks:volume>%d</aks:volume>\n"\
+				"      <aks:noise>%d</aks:noise>\n"\
+				"      <aks:softwarePeriod>%d</aks:softwarePeriod>\n"\
+				"      <aks:softwareArpeggio>0</aks:softwareArpeggio>\n"\
+				"      <aks:softwarePitch>0</aks:softwarePitch>\n"\
+				"      <aks:ratio>1</aks:ratio>\n"\
+				"      <aks:hardwareCurve>8</aks:hardwareCurve>\n"\
+				"      <aks:hardwarePeriod>0</aks:hardwarePeriod>\n"\
+				"      <aks:hardwareArpeggio>0</aks:hardwareArpeggio>\n"\
+				"      <aks:hardwarePitch>0</aks:hardwarePitch>\n"\
+				"      <aks:isRetrig>false</aks:isRetrig>\n"\
+				"    </aks:fmInstrumentCell>\n",AYvolume[0],makenoise,AYperiod[0]);
+		}
+	}
+
+	if (akifilename) {
+		fprintf(akifile,"  </aks:fmInstrument>\n</aks:instrument>\n");
+		fclose(akifile);
 	}
 
 	if (wavout_filename) {
@@ -879,9 +932,6 @@ void do_sample(double *data,int n, double pw, double cutlow, double cuthigh, dou
 }
 
 
-
-
-
 void usage() {
 	printf("=========== conversion from WAV to AY registers ===========\n");
 	printf("usage: wav2ay.exe <wavfile> <options>\n");
@@ -898,6 +948,7 @@ void usage() {
 	printf("-dmalist         output optimised DMA list\n");
 	printf("-cpclist         output optimised list for CPC replay\n");
 	printf("-wavout <file>   output WAV preview\n");
+	printf("-aki    <file>   output AKI file for Arkos Track 2\n");
 	printf("-verbose\n");
 	printf("\n");
 	exit(1);
@@ -911,6 +962,7 @@ void main(int argc, char **argv) {
 	int nbchannel,dmalist,cpclist;
 	int channel_list[3],ichan=0;
 	char *wavoutfilename=NULL;
+	char *akifilename=NULL;
 
 	dmalist=cpclist=0;
 	preamp=1.0;
@@ -938,6 +990,8 @@ void main(int argc, char **argv) {
 		} else if (strcmp(argv[i],"-tresh")==0 && i+1<argc) {
 			treshold=atof(argv[++i]);
 			if (treshold<0.5) treshold=0.5;
+		} else if (strcmp(argv[i],"-aki")==0 && i+1<argc) {
+			akifilename=argv[++i];
 		} else if (strcmp(argv[i],"-wavout")==0 && i+1<argc) {
 			wavoutfilename=argv[++i];
 		} else if (strcmp(argv[i],"-wfreq")==0 && i+1<argc) {
@@ -973,10 +1027,19 @@ void main(int argc, char **argv) {
 		} else usage();
 	}
 
+	if (akifilename && nbchannel!=1) {
+		fprintf(stderr,"AKI mode will force output to one channel\n");
+		nbchannel=1;
+	}
+	if (akifilename && replay!=50 && replay!=25 && replay!=12) {
+		fprintf(stderr,"AKI mode will force frequency to 50Hz (if not already set to 50,25 or 12)\n");
+		replay=50;
+	}
+
 	if (ifilename==-1) usage();
 
 	if ((data=load_wav(argv[ifilename],&n,&acqui))!=NULL) {
-		do_sample(data,n,pw,cutlow,cuthigh,acqui,replay,preamp,info,workingfreq,nbchannel,treshold,dmalist,wavoutfilename,channel_list,cpclist);
+		do_sample(data,n,pw,cutlow,cuthigh,acqui,replay,preamp,info,workingfreq,nbchannel,treshold,dmalist,wavoutfilename,channel_list,cpclist,akifilename);
 	}
 }
 
