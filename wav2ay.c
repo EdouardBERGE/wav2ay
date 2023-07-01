@@ -672,9 +672,11 @@ void do_sample(double *data,int n, double pw, double cutlow, double cuthigh, dou
 				subcoef=fourier[k]/ay[imax].fourier[k];
 				for (j=0;j<=ws/2;j++) fourier[j]-=ay[imax].fourier[j]*subcoef;
 
-//export_csv("fourier_ay.csv",ay[imax].fourier,ws/2+1);
-//export_csv("fourier_sortie.csv",fourier,ws/2+1);
-//exit(1);
+				/* simple psycho acoustic model ???
+				double *tmpbuffer=NULL;
+				passe_bande(acqui,peak*0.8,peak*1.5,datain,tmpbuffer,nb);
+				// substract
+				*/
 
 				// produire les registres AY (imax=periode)
 				AYperiod[channel]=imax;
@@ -886,6 +888,9 @@ void do_sample(double *data,int n, double pw, double cutlow, double cuthigh, dou
 		}
 
 		if (akifilename) {
+			if (AYperiod[0]>4095) AYperiod[0]=AYprevperiod[0]; // try to get previous value
+			if (AYperiod[0]>4095) AYperiod[0]=4095; // still out of bounds?
+
 			fprintf(akifile,"    <aks:fmInstrumentCell>\n"\
 				"      <aks:link>softOnly</aks:link>\n"\
 				"      <aks:volume>%d</aks:volume>\n"\
@@ -906,6 +911,16 @@ void do_sample(double *data,int n, double pw, double cutlow, double cuthigh, dou
 	if (akifilename) {
 		fprintf(akifile,"  </aks:fmInstrument>\n</aks:instrument>\n");
 		fclose(akifile);
+
+		if (nbwin>63) {
+			fprintf(stderr,"****************************************\n");
+			fprintf(stderr," Warning AKI instrument has more than\n");
+			fprintf(stderr," 64 pattern, Arkos Tracker 2 will crash\n");
+			fprintf(stderr,"\n");
+			fprintf(stderr," the file is saved anyway because it's\n");
+			fprintf(stderr," better to let YOU cut yourself data ;)\n");
+			fprintf(stderr,"****************************************\n");
+		}
 	}
 
 	if (wavout_filename) {
