@@ -56,25 +56,21 @@ ld a,e : cp 12 : jr z,contexte_ok : call read_psg : inc e : jr enregistre_contex
 contexte_ok
 
 ; Enfin on initialise notre "sample"
+; mixer init tous canaux ouverts
+ld c,7 : ld hl,openmix : call routine_SendPSG
 ; volume A/B/C a zero
-ld c,8
+inc c
 volume_zero
 ld hl,unzero+1
 call routine_SendPSG
 inc c : ld a,c : cp 11
 jr nz,volume_zero
-; mixer init tous canaux ouverts
-ld c,7 : out (c),c : exx : out (c),e
-defb #ED,#71 ; out (c),0
-exx
-ld c,%111000 : out (c),c : exx : out (c),c
-defb #ED,#71 ; out (c),0
-exx
 
 xor a : ld (sample_play),a ; activer la routine
 ret
 
-music_context defs 12
+music_context defs 11
+openmix defb %111000
 
 read_psg out (c),a : exx : out (c),e
 defb #ED,#71 ; out (c),0
