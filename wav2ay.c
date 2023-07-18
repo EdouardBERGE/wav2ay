@@ -494,7 +494,7 @@ int getvolume(double level) {
 	return volume;
 }
 
-void do_sample(double *data,int n, double pw, double cutlow, double cuthigh, double acqui, double replay, double preamp, int info, double workingfreq, int nbchannel, double treshold, int dmalist, char *wavout_filename, int *channel_list, int cpclist, char *akifilename) {
+void do_sample(double *data,int n, double pw, double cutlow, double cuthigh, double acqui, double replay, double preamp, int info, double workingfreq, int nbchannel, double treshold, int dmalist, char *wavout_filename, int *channel_list, int cpclist, char *akifilename, int noiseblocker) {
 	double *fourier,*oldfourier;
 	double *newdata,subcoef;
 	double vmax,resolution,picfreq;
@@ -661,7 +661,7 @@ void do_sample(double *data,int n, double pw, double cutlow, double cuthigh, dou
 				picfreq=calcule_fourier_precision(&data[ws*i],ws,imax,cutlow,imax*resolution)*resolution;
 				if (info) fprintf(stderr," => recherche de precision donne %.1lfHz\n",picfreq);
 
-				if (picfreq>2500) makenoise++;
+				if (picfreq>2500 && !noiseblocker) makenoise++;
 
 				// appliquer la soustraction AY sur la transformee de Fourier pour la suite
 				imax=workingfreq/picfreq; // periode AY
@@ -960,6 +960,7 @@ void usage() {
 	printf("-wfreq  <value>  AY frequency  | default 1000000 (1MHz)\n");
 	printf("-nbchan <value>  nb channel    | default 3\n");
 	printf("-chans  <value>  channel used  | default 'ABC'\n");
+	printf("-noiseblocker    disable noise management\n");
 	printf("-dmalist         output optimised DMA list\n");
 	printf("-cpclist         output optimised list for CPC replay\n");
 	printf("-wavout <file>   output WAV preview\n");
@@ -973,7 +974,7 @@ void main(int argc, char **argv) {
 	int info,n,i,ifilename=-1,idx;
 	double *data;
 	// conversion param
-	double preamp,replay,acqui,cuthigh,cutlow,pw,workingfreq,treshold;
+	double preamp,replay,acqui,cuthigh,cutlow,pw,workingfreq,treshold,noiseblocker;
 	int nbchannel,dmalist,cpclist;
 	int channel_list[3],ichan=0;
 	char *wavoutfilename=NULL;
@@ -989,6 +990,7 @@ void main(int argc, char **argv) {
 	workingfreq=62500.0;
 	nbchannel=3;
 	treshold=0.5;
+	noiseblocker=0;
 
 	// default channels
 	channel_list[0]=8;
@@ -1054,7 +1056,7 @@ void main(int argc, char **argv) {
 	if (ifilename==-1) usage();
 
 	if ((data=load_wav(argv[ifilename],&n,&acqui))!=NULL) {
-		do_sample(data,n,pw,cutlow,cuthigh,acqui,replay,preamp,info,workingfreq,nbchannel,treshold,dmalist,wavoutfilename,channel_list,cpclist,akifilename);
+		do_sample(data,n,pw,cutlow,cuthigh,acqui,replay,preamp,info,workingfreq,nbchannel,treshold,dmalist,wavoutfilename,channel_list,cpclist,akifilename,noiseblocker);
 	}
 }
 
