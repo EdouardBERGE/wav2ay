@@ -8,9 +8,9 @@ Tool using Fourier transform, doing sample conversion to simple frequencies
 
 
 ## usage:
-
+```
 wav2ay.exe <wavfile> <options>
-
+```
 ## options:
 ```
 -preamp <value>  amplification | default 1.0
