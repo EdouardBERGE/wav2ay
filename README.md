@@ -12,6 +12,7 @@ Tool using Fourier transform, doing sample conversion to simple frequencies
 wav2ay.exe <wavfile> <options>
 
 ## options:
+```
 -preamp <value>  amplification | default 1.0
 -tresh  <value>  minimal energy| default 0.25 is minimum (max usable approx 15)
 -replay <value>  frequency play| default 10
@@ -26,5 +27,6 @@ wav2ay.exe <wavfile> <options>
 -wavout <file>   output WAV preview
 -aki    <file>   output AKI file for Arkos Track 2
 -verbose
+```
 
 ![Street Fighter 2 Adoken conversion](https://github.com/EdouardBERGE/wav2ay/blob/main/mimic.png)
