@@ -172,7 +172,7 @@ double __internal_getsample32(unsigned char *data, int *idx) {
 	peteher=(float*)(&data[*idx]);
         v=*peteher;
 	*idx=*idx+4;
-	return v;
+	return v*128.0;
 }
 
 double *load_wav(char *filename, int *n, double *acqui) {
@@ -565,7 +565,7 @@ void do_sample(double *data,int n, double pw, double cutlow, double cuthigh, dou
 		fprintf(stderr,"previous weight not in [0.0:0.75] interval. Default value is 0.25\n");
 		pw=0.25;
 	}
-	if (acqui<4000 || acqui>44100) {
+	if (acqui<4000 || acqui>48000) {
 		fprintf(stderr,"wrong acquisition frequency. Default value is 15.6KHz\n");
 		acqui=15600.0;
 	}
@@ -1023,9 +1023,8 @@ void main(int argc, char **argv) {
 
 	dmalist=cpclist=0;
 	preamp=1.0;
-	replay=10;
 	cuthigh=4000;
-	cutlow=replay;
+	cutlow=replay=10;
 	pw=0.0;
 	info=0;
 	workingfreq=62500.0;
@@ -1073,7 +1072,7 @@ void main(int argc, char **argv) {
 			nbchannel=atoi(argv[++i]);
 			if (nbchannel<1 || nbchannel>MAXCHANNEL) usage();
 		} else if (strcmp(argv[i],"-replay")==0 && i+1<argc) {
-			replay=atof(argv[++i]);
+			cutlow=replay=atof(argv[++i]);
 		} else if (strcmp(argv[i],"-high")==0 && i+1<argc) {
 			cuthigh=atof(argv[++i]);
 		} else if (strcmp(argv[i],"-low")==0 && i+1<argc) {
