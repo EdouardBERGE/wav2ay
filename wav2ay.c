@@ -45,6 +45,15 @@ Software. »
 
 #define MAXCHANNEL 3
 
+enum
+{
+    O32_LITTLE_ENDIAN = 0x03020100ul,
+    O32_BIG_ENDIAN = 0x00010203ul,
+    O32_PDP_ENDIAN = 0x01000302ul,      /* DEC PDP-11 (aka ENDIAN_LITTLE_WORD) */
+    O32_HONEYWELL_ENDIAN = 0x02030001ul /* Honeywell 316 (aka ENDIAN_BIG_WORD) */
+};
+
+
 /*************************************************************************
   CSV Export Func
 *************************************************************************/
@@ -158,6 +167,13 @@ double __internal_getsample16(unsigned char *data, int *idx) {
 	most=(char*)data;
         v=most[*idx+1];v+=data[*idx]/256.0;*idx=*idx+2;return v;
 }
+double __internal_getsample32(unsigned char *data, int *idx) {
+	float v,*peteher;
+	peteher=(float*)(&data[*idx]);
+        v=*peteher;
+	*idx=*idx+4;
+	return v;
+}
 
 double *load_wav(char *filename, int *n, double *acqui) {
 	struct s_wav_header *wav_header;
@@ -230,8 +246,32 @@ double *load_wav(char *filename, int *n, double *acqui) {
         }
 
         wFormat=wav_header->AudioFormat[0]+wav_header->AudioFormat[1]*256;
-        if (wFormat!=1) {
-                fprintf(stderr,"WAV import - invalid or unsupported wFormatTag (%04X)\n",wFormat);
+        if (wFormat!=1 && wFormat!=3) {
+                fprintf(stderr,"WAV import - invalid or unsupported wFormatTag (%04X) ",wFormat);
+		switch (wFormat) {
+			case -2:fprintf(stderr,"Extensible Format (user defined) \n");
+			default:
+			case 0:fprintf(stderr,"	Unknown Format\n");
+			case 1:fprintf(stderr,"	PCM format (8 or 16 bit), Microsoft Corporation\n");
+			case 2:fprintf(stderr,"	AD PCM Format, Microsoft Corporation\n");
+			case 3:fprintf(stderr,"	IEEE PCM Float format (32 bit)\n");
+			case 48:fprintf(stderr,"AC2, Dolby Laboratories\n");
+			case 49:fprintf(stderr,"GSM 6.10, Microsoft Corporation\n");
+			case 50:fprintf(stderr,"MSN Audio, Microsoft Corporation\n");
+			case 80:fprintf(stderr,"MPEG format\n");
+			case 85:fprintf(stderr,"ISO/MPEG Layer3 Format\n");
+			case 146:fprintf(stderr,"AC3 Digital, Sonic Foundry\n");
+			case 255:fprintf(stderr,"Raw AAC\n");
+			case 352:fprintf(stderr,"Microsoft Corporation\n");
+			case 353:fprintf(stderr,"Windows Media Audio. This format is valid for versions 2 through 9\n");
+			case 354:fprintf(stderr,"Windows Media Audio 9 Professional\n");
+			case 355:fprintf(stderr,"Windows Media Audio 9 Lossless\n");
+			case 356:fprintf(stderr,"Windows Media SPDIF Digital Audio\n");
+			case 5632:fprintf(stderr,"ADTS AAC Audio\n");
+			case 5633:fprintf(stderr,"Raw AAC\n");
+			case 5634:fprintf(stderr,"MPEG-4 audio transport stream with a synchronization layer (LOAS) and a multiplex layer (LATM)\n");
+			case 5648:fprintf(stderr,"High-Efficiency Advanced Audio Coding (HE-AAC) stream\n");
+		}
 		free(data);
                 return NULL;
         }
@@ -242,7 +282,8 @@ double *load_wav(char *filename, int *n, double *acqui) {
 	switch (bitspersample) {
 		case 8:_internal_getsample=__internal_getsample8;break;
 		case 16:_internal_getsample=__internal_getsample16;break;
-		default:fprintf(stderr,"unsupported bits per sample size %d\n",bitspersample); free(data);return NULL;
+		case 32:_internal_getsample=__internal_getsample32;break;
+		default:fprintf(stderr,"unsupported bits per sample size %d (valid are PCM-8, PCM-16 and FLOAT-32)\n",bitspersample); free(data);return NULL;
 	}
 
         nbsample=controlsize/nbchannel/(bitspersample/8);
