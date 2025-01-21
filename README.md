@@ -30,3 +30,11 @@ wav2ay.exe <wavfile> <options>
 ```
 
 ![Street Fighter 2 Adoken conversion](https://github.com/EdouardBERGE/wav2ay/blob/main/mimic.png)
+
+
+wav2ay evolutions were suggested by Maitre Joe for the use in his last game https://amstrad-ggp.itch.io/mightysf
+
+![Mighty Steel Fighter 2](https://github.com/EdouardBERGE/wav2ay/blob/main/mighty.png)
+
+
+
