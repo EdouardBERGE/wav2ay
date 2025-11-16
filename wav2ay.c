@@ -826,10 +826,11 @@ void do_sample(double *data,int n, double pw, double cutlow, double cuthigh, dou
 			int zebit=128;
 
 			if (!i) {
+				if (nbwin>255) printf("defw %d ; nombre d'iterations (ATTENTION, valeur 16 bits inadaptée au player standard!)\n",nbwin); else
 				printf("defb %d ; nombre d'iterations\n",nbwin);
 			}
 
-			for (channel=0;channel<3;channel++) {
+			for (channel=0;channel<nbchannel;channel++) {
 				if (AYvolume[channel]!=AYprevvolume[channel]) {
 					packed_exec|=zebit;
 					minilist[ilist++]=AYvolume[channel];
